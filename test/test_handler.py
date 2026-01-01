@@ -10,7 +10,7 @@ import sys
 utils_dir = os.path.join(os.path.dirname(__file__), '..', 'utils')
 sys.path.insert(0, utils_dir)
 
-from pdf_handler import upload_to_own_cloud_server, process_pdf_with_path
+from utils.pdf_handler import upload_to_own_cloud_server, process_pdf_with_path
 from utils.config import *
 
 def test_upload_only():

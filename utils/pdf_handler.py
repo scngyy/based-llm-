@@ -133,11 +133,9 @@ def select_and_process_pdf():
             # 直接调用API解析方法
             markdown_file_path = parser.parse_pdf_to_markdown(pdf_url)
             
-            # 读取解析结果
-            with open(markdown_file_path, 'r', encoding='utf-8') as f:
-                markdown_content = f.read()
-                
-            print(f"✅ 解析完成，内容长度: {len(markdown_content)}")
+            # 获取文件大小而不是读取内容
+            file_size = os.path.getsize(markdown_file_path)
+            print(f"✅ 解析完成，文件大小: {file_size} 字节")
             
         except Exception as e:
             return {
@@ -150,36 +148,25 @@ def select_and_process_pdf():
             print("步骤3: 清洗Markdown...")
             cleaner = markdown_cleaner.MarkdownCleaner()
             
-            # 创建临时文件进行清洗
-            import tempfile
-            import os
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as temp_file:
-                temp_file.write(markdown_content)
-                temp_file_path = temp_file.name
-            
             try:
-                # 清洗文件
-                cleaned_file_path = cleaner.clean_markdown(temp_file_path)
+                # 直接清洗解析得到的Markdown文件
+                cleaned_file_path = cleaner.clean_markdown(markdown_file_path)
                 
-                # 读取清洗后的内容
-                with open(cleaned_file_path, 'r', encoding='utf-8') as f:
-                    markdown_content = f.read()
-                
+                # 更新markdown_file_path为清洗后的文件路径
+                markdown_file_path = cleaned_file_path
                 print("✅ 清洗完成")
             except Exception as e:
-                print(f"⚠️ 清洗失败，使用原始内容: {str(e)}")
-            finally:
-                # 删除临时文件
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-                # 删除清洗后的临时文件（如果存在）
-                if 'cleaned_file_path' in locals() and os.path.exists(cleaned_file_path):
-                    os.unlink(cleaned_file_path)
+                print(f"⚠️ 清洗失败，使用原始文件: {str(e)}")
+                # 保持使用原始的markdown_file_path
         
         # 步骤4: 内容切分
         chunks = []
         if ENABLE_SPLITTING:
             print("步骤4: 切分内容...")
+            # 从文件读取内容
+            with open(markdown_file_path, 'r', encoding='utf-8') as f:
+                markdown_content = f.read()
+            
             splitter = chunk_splitter.ChunkSplitter(CHUNK_SIZE, CHUNK_OVERLAP)
             split_result = splitter.split_content(markdown_content, {})
             
@@ -190,6 +177,9 @@ def select_and_process_pdf():
                 print(f"⚠️ 切分失败，使用完整内容: {split_result.get('error', '未知错误')}")
                 chunks = [{"content": markdown_content, "index": 0}]
         else:
+            # 从文件读取内容
+            with open(markdown_file_path, 'r', encoding='utf-8') as f:
+                markdown_content = f.read()
             chunks = [{"content": markdown_content, "index": 0}]
         
         # 步骤5: Prompt构建
@@ -204,6 +194,9 @@ def select_and_process_pdf():
                 print(f"✅ Prompt构建完成，生成 {len(prompts)} 个prompt")
             else:
                 print(f"⚠️ Prompt构建失败，使用原始内容: {prompt_result.get('error', '未知错误')}")
+                # 从文件读取内容
+                with open(markdown_file_path, 'r', encoding='utf-8') as f:
+                    markdown_content = f.read()
                 prompts = [{"content": markdown_content, "type": "raw"}]
         
         processing_time = time.time() - start_time
@@ -216,7 +209,7 @@ def select_and_process_pdf():
             "data": {
                 "file_path": file_path,
                 "pdf_url": pdf_url,
-                "markdown_content": markdown_content,
+                "markdown_file_path": markdown_file_path,  # 返回文件路径而不是内容
                 "chunks": chunks,
                 "prompts": prompts,
                 "processing_time": processing_time,
